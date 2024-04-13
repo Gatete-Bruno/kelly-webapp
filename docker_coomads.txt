@@ -1,0 +1,8 @@
+docker network create to-do
+
+docker run -d --name mysql_container --network to-do -e MYSQL_ROOT_PASSWORD=kelly -p 3306:3306 mysql:latest
+
+docker build -t kigali .
+
+docker run -d -p 5000:5000 --name kigali_container --network to-do kigali:latest
+
