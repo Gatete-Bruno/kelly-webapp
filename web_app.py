@@ -1,9 +1,16 @@
-import os
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
+import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'mysql+pymysql://username:password@localhost/task_management_db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+def authenticate():
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        raise ValueError("DATABASE_URL environment variable is not set")
+    return db_url
+
 db = SQLAlchemy(app)
 
 # Define SQLAlchemy models
@@ -84,4 +91,6 @@ def view_task(task_id):
     return render_template('view_task.html', task=task)
 
 if __name__ == '__main__':
+    db_url = authenticate()
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
     app.run(debug=True)
