@@ -4,10 +4,13 @@ import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv('.env')
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Set up SQLAlchemy
 db = SQLAlchemy(app)
 
 # Define SQLAlchemy models
@@ -88,4 +91,4 @@ def view_task(task_id):
     return render_template('view_task.html', task=task)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
