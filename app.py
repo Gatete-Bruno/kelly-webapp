@@ -1,196 +1,92 @@
-import pymysql
+from flask import Flask, render_template, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
+import os
+from dotenv import load_dotenv
 
-def task_management_app(name):
-    # Function to authenticate user credentials
-    def authenticate():
-        while True:
-            username = input("Enter your username: ")
-            pword = input('Enter your password: ')
-            try:
-                connection = pymysql.connect(host='localhost',
-                                             user=username,
-                                             password=pword,
-                                             database=name,
-                                             cursorclass=pymysql.cursors.DictCursor,
-                                             autocommit=True)
-                return connection
-            except pymysql.Error as e:
-                code, msg = e.args
-                print("Cannot connect to the database", code, msg)
+# Load environment variables from .env file
+load_dotenv()
 
-    # Function to display main menu options
-    def display_menu():
-        print("Main Menu:")
-        print("1. Create Task")
-        print("2. View Task")
-        print("3. Update Task")
-        print("4. Add Comment")
-        print("5. View Comments")
-        print("6. Delete Task")
-        print("7. Exit")
+app = Flask(__name__)
+# Retrieve database credentials from environment variables
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
+db = SQLAlchemy(app)
 
-    # Function to create a task
-    def create_task(connection):
-        print("Create Task:")
-        task_name = input("Enter task name: ")
-        task_description = input("Enter task description: ")
-        task_due_date = input("Enter task due date (YYYY-MM-DD): ")
+# Define SQLAlchemy models
+class Category(db.Model):
+    __tablename__ = 'Category'
+    CategoryID = db.Column(db.Integer, primary_key=True)
+    Name = db.Column(db.String(255), nullable=False)
 
-        # Display category options
-        print("Available Categories: School, Work, Personal, Health and Fitness")
-        category = input("Enter category: ")
+class Priority(db.Model):
+    __tablename__ = 'Priority'
+    PriorityID = db.Column(db.Integer, primary_key=True)
+    Name = db.Column(db.String(255), nullable=False)
 
-        # Display priority options
-        print("Available Priorities: High, Medium, Low")
-        priority = input("Enter priority: ")
+class Status(db.Model):
+    __tablename__ = 'Status'
+    StatusID = db.Column(db.Integer, primary_key=True)
+    Name = db.Column(db.String(255), nullable=False)
 
-        # Display status options
-        print("Available Status: Not started, In progress, Completed")
-        status = input("Enter status: ")
+class Task(db.Model):
+    __tablename__ = 'Task'
+    TaskID = db.Column(db.Integer, primary_key=True)
+    Title = db.Column(db.String(255), nullable=False)
+    Description = db.Column(db.Text)
+    DueDate = db.Column(db.Date)
+    CategoryID = db.Column(db.Integer, db.ForeignKey('Category.CategoryID'))
+    PriorityID = db.Column(db.Integer, db.ForeignKey('Priority.PriorityID'))
+    StatusID = db.Column(db.Integer, db.ForeignKey('Status.StatusID'))
+    
+    category = db.relationship('Category', backref=db.backref('tasks'))
+    priority = db.relationship('Priority', backref=db.backref('tasks'))
+    status = db.relationship('Status', backref=db.backref('tasks'))
 
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('CreateTask', (task_name, task_description, task_due_date, category, priority, status))
-                print("Task created successfully!")
-        except pymysql.Error as e:
-            print("Error creating task:", e)
+class TaskComment(db.Model):
+    __tablename__ = 'TaskComment'
+    CommentID = db.Column(db.Integer, primary_key=True)
+    TaskID = db.Column(db.Integer, db.ForeignKey('Task.TaskID'))
+    Comment = db.Column(db.Text)
+    Timestamp = db.Column(db.TIMESTAMP, server_default=db.func.current_timestamp())
 
-    # Function to view tasks by task name
-    def view_task_by_name(connection):
-        print("View Task by Name:")
-        task_name = input("Enter task name: ")
+    task = db.relationship('Task', backref=db.backref('comments'))
 
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('GetTaskByName', (task_name,))
-                result_set = cursor.fetchall()
-                for row in result_set:
-                    print(row)
-        except pymysql.Error as e:
-            print("Error fetching tasks by name:", e)
+# Define routes
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-    # Function to view tasks by priority
-    def view_task_by_priority(connection):
-        print("View Task by Priority:")
-        priority_name = input("Enter priority name: ")
+@app.route('/create_task', methods=['GET', 'POST'])
+def create_task():
+    if request.method == 'POST':
+        task_name = request.form['task_name']
+        task_description = request.form['task_description']
+        task_due_date = request.form['task_due_date']
+        category_name = request.form['category']
+        priority_name = request.form['priority']
+        status_name = request.form['status']
+        
+        # Fetch category, priority, and status objects
+        category = Category.query.filter_by(Name=category_name).first()
+        priority = Priority.query.filter_by(Name=priority_name).first()
+        status = Status.query.filter_by(Name=status_name).first()
+        
+        # Create new task object
+        new_task = Task(Title=task_name, Description=task_description, DueDate=task_due_date,
+                        Category=category, Priority=priority, Status=status)
+        
+        db.session.add(new_task)
+        db.session.commit()
+        return redirect(url_for('index'))
+    else:
+        categories = Category.query.all()
+        priorities = Priority.query.all()
+        statuses = Status.query.all()
+        return render_template('create_task.html', categories=categories, priorities=priorities, statuses=statuses)
 
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('GetTaskByPriority', (priority_name,))
-                result_set = cursor.fetchall()
-                for row in result_set:
-                    print(row)
-        except pymysql.Error as e:
-            print("Error fetching tasks by priority:", e)
-
-    # Function to update task status
-    def update_task_status(connection):
-        print("Update Task Status:")
-        task_name = input("Enter task name to update: ")
-        new_status = input("Enter new status: ")
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('UpdateTaskStatus', (task_name, new_status))
-                print("Task status updated successfully!")
-        except pymysql.Error as e:
-            print("Error updating task status:", e)
-
-    # Function to update task due date
-    def update_task_due_date(connection):
-        print("Update Task Due Date:")
-        task_name = input("Enter task name to update: ")
-        new_due_date = input("Enter new due date (YYYY-MM-DD): ")
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('UpdateTaskDueDate', (task_name, new_due_date))
-                print("Task due date updated successfully!")
-        except pymysql.Error as e:
-            print("Error updating task due date:", e)
-
-    # Function to add comment to task
-    def add_comment(connection):
-        print("Add Comment:")
-        task_name = input("Enter task name: ")
-        comment_text = input("Enter comment: ")
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('CreateTaskComment', (task_name, comment_text))
-                print("Comment added successfully!")
-        except pymysql.Error as e:
-            print("Error adding comment:", e)
-
-    # Function to view comments for task
-    def view_comments(connection):
-        print("View Comments:")
-        task_name = input("Enter task name: ")
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('GetTaskComments', (task_name,))
-                result_set = cursor.fetchall()
-                for row in result_set:
-                    print(row)
-        except pymysql.Error as e:
-            print("Error fetching comments:", e)
-
-    # Function to delete task
-    def delete_task(connection):
-        print("Delete Task:")
-        task_name = input("Enter task name to delete: ")
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.callproc('DeleteTask', (task_name,))
-                print("Task deleted successfully!")
-        except pymysql.Error as e:
-            print("Error deleting task:", e)
-
-    # Main application flow
-    connection = authenticate()
-
-    while True:
-        display_menu()
-        choice = input("Enter your choice: ")
-
-        if choice == "1":
-            create_task(connection)
-        elif choice == "2":
-            print("View Task:")
-            print("1. By Task Name")
-            print("2. By Priority")
-            view_choice = input("Enter your choice: ")
-            if view_choice == "1":
-                view_task_by_name(connection)
-            elif view_choice == "2":
-                view_task_by_priority(connection)
-            else:
-                print("Invalid choice. Please try again.")
-        elif choice == "3":
-            print("Update Task:")
-            print("1. Update Task Status")
-            print("2. Update Task Due Date")
-            update_choice = input("Enter your choice: ")
-            if update_choice == "1":
-                update_task_status(connection)
-            elif update_choice == "2":
-                update_task_due_date(connection)
-            else:
-                print("Invalid choice. Please try again.")
-        elif choice == "4":
-            add_comment(connection)
-        elif choice == "5":
-            view_comments(connection)
-        elif choice == "6":
-            delete_task(connection)
-        elif choice == "7":
-            print("Exiting...")
-            connection.close()
-            break
-        else:
-            print("Invalid choice. Please try again.")
+@app.route('/view_task/<task_id>')
+def view_task(task_id):
+    task = Task.query.get(task_id)
+    return render_template('view_task.html', task=task)
 
 if __name__ == '__main__':
-    task_management_app('task_management_db')
+    app.run(debug=True)
