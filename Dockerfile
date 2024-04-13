@@ -13,6 +13,7 @@ COPY requirements.txt /app/
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install python-dotenv   # Add this line to install python-dotenv
 
 # Copy the content of the local src directory to the working directory
 COPY . /app/
