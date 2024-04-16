@@ -1,82 +1,59 @@
-import os
-import pymysql
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+import os
 
+# Initialize Flask app
 app = Flask(__name__)
 
-# Set up SQLAlchemy
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
+# Configure MySQL connection
+DB_USERNAME = os.environ.get('DB_USERNAME', 'root')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', 'kelly')
+DB_HOST = os.environ.get('DB_HOST', 'localhost')
+DB_NAME = os.environ.get('DB_NAME', 'task_management_db')
+
+SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}'
+app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize SQLAlchemy
 db = SQLAlchemy(app)
 
-# Define your models and routes below...
+# Define your models here
+class Task(db.Model):
+    __tablename__ = 'Task'
+    TaskID = db.Column(db.Integer, primary_key=True)
+    Title = db.Column(db.String(255), nullable=False)
+    Description = db.Column(db.Text)
+    DueDate = db.Column(db.Date)
+    CategoryID = db.Column(db.Integer, db.ForeignKey('Category.CategoryID'))
+    PriorityID = db.Column(db.Integer, db.ForeignKey('Priority.PriorityID'))
+    StatusID = db.Column(db.Integer, db.ForeignKey('Status.StatusID'))
 
-def task_management_app(name):
-    # Function to authenticate user credentials
-    def authenticate():
-        db_username = os.getenv('DB_USERNAME')
-        db_password = os.getenv('DB_PASSWORD')
-        db_host = os.getenv('DB_HOST')
-        db_name = os.getenv('DB_NAME')
+    # Define relationships here
+    category = db.relationship('Category', backref=db.backref('tasks', lazy=True))
+    priority = db.relationship('Priority', backref=db.backref('tasks', lazy=True))
+    status = db.relationship('Status', backref=db.backref('tasks', lazy=True))
 
-        try:
-            connection = pymysql.connect(host=db_host,
-                                         user=db_username,
-                                         password=db_password,
-                                         database=db_name,
-                                         cursorclass=pymysql.cursors.DictCursor,
-                                         autocommit=True)
-            return connection
-        except pymysql.Error as e:
-            print("Cannot connect to the database", e)
+class Category(db.Model):
+    __tablename__ = 'Category'
+    CategoryID = db.Column(db.Integer, primary_key=True)
+    Name = db.Column(db.String(255), nullable=False)
 
-    # Function to display main menu options
-    def display_menu():
-        print("Main Menu:")
-        print("1. Create Task")
-        print("2. View Task")
-        print("3. Update Task")
-        print("4. Add Comment")
-        print("5. View Comments")
-        print("6. Delete Task")
-        print("7. Exit")
+class Priority(db.Model):
+    __tablename__ = 'Priority'
+    PriorityID = db.Column(db.Integer, primary_key=True)
+    Name = db.Column(db.String(255), nullable=False)
 
-    # Define your other functions here...
+class Status(db.Model):
+    __tablename__ = 'Status'
+    StatusID = db.Column(db.Integer, primary_key=True)
+    Name = db.Column(db.String(255), nullable=False)
 
-    # Main application flow
-    connection = authenticate()
+# Define your routes here
+@app.route('/')
+def index():
+    return 'Hello, World!'
 
-    while True:
-        display_menu()
-        choice = input("Enter your choice: ")
-
-        if choice == "1":
-            # Implement your create task logic here
-            pass
-        elif choice == "2":
-            # Implement your view task logic here
-            pass
-        elif choice == "3":
-            # Implement your update task logic here
-            pass
-        elif choice == "4":
-            # Implement your add comment logic here
-            pass
-        elif choice == "5":
-            # Implement your view comments logic here
-            pass
-        elif choice == "6":
-            # Implement your delete task logic here
-            pass
-        elif choice == "7":
-            print("Exiting...")
-            connection.close()
-            break
-        else:
-            print("Invalid choice. Please try again.")
-
+# Run the Flask app
 if __name__ == '__main__':
-    task_management_app('task_management_db')
+    app.run(debug=True)
