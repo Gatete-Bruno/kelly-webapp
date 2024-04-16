@@ -1,59 +1,45 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-import os
+from flask import Flask, jsonify, request
+from flask_mysqldb import MySQL
 
-# Initialize Flask app
+# Initialize Flask application
 app = Flask(__name__)
 
 # Configure MySQL connection
-DB_USERNAME = os.environ.get('DB_USERNAME', 'root')
-DB_PASSWORD = os.environ.get('DB_PASSWORD', 'kelly')
-DB_HOST = os.environ.get('DB_HOST', 'localhost')
-DB_NAME = os.environ.get('DB_NAME', 'task_management_db')
+app.config['MYSQL_HOST'] = 'db'  # Docker Compose service name for MySQL container
+app.config['MYSQL_USER'] = 'root'
+app.config['MYSQL_PASSWORD'] = 'kelly'
+app.config['MYSQL_DB'] = 'task_management_db'
 
-SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}'
-app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Initialize MySQL
+mysql = MySQL(app)
 
-# Initialize SQLAlchemy
-db = SQLAlchemy(app)
+# Define routes
 
-# Define your models here
-class Task(db.Model):
-    __tablename__ = 'Task'
-    TaskID = db.Column(db.Integer, primary_key=True)
-    Title = db.Column(db.String(255), nullable=False)
-    Description = db.Column(db.Text)
-    DueDate = db.Column(db.Date)
-    CategoryID = db.Column(db.Integer, db.ForeignKey('Category.CategoryID'))
-    PriorityID = db.Column(db.Integer, db.ForeignKey('Priority.PriorityID'))
-    StatusID = db.Column(db.Integer, db.ForeignKey('Status.StatusID'))
+# Route to retrieve all tasks
+@app.route('/tasks', methods=['GET'])
+def get_tasks():
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM Task")
+    tasks = cur.fetchall()
+    cur.close()
+    return jsonify(tasks)
 
-    # Define relationships here
-    category = db.relationship('Category', backref=db.backref('tasks', lazy=True))
-    priority = db.relationship('Priority', backref=db.backref('tasks', lazy=True))
-    status = db.relationship('Status', backref=db.backref('tasks', lazy=True))
+# Route to create a new task
+@app.route('/tasks', methods=['POST'])
+def create_task():
+    data = request.json
+    title = data['title']
+    description = data['description']
+    due_date = data['due_date']
+    category_id = data['category_id']
+    priority_id = data['priority_id']
+    status_id = data['status_id']
+    cur = mysql.connection.cursor()
+    cur.execute("INSERT INTO Task (Title, Description, DueDate, CategoryID, PriorityID, StatusID) VALUES (%s, %s, %s, %s, %s, %s)", (title, description, due_date, category_id, priority_id, status_id))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({"message": "Task created successfully"})
 
-class Category(db.Model):
-    __tablename__ = 'Category'
-    CategoryID = db.Column(db.Integer, primary_key=True)
-    Name = db.Column(db.String(255), nullable=False)
-
-class Priority(db.Model):
-    __tablename__ = 'Priority'
-    PriorityID = db.Column(db.Integer, primary_key=True)
-    Name = db.Column(db.String(255), nullable=False)
-
-class Status(db.Model):
-    __tablename__ = 'Status'
-    StatusID = db.Column(db.Integer, primary_key=True)
-    Name = db.Column(db.String(255), nullable=False)
-
-# Define your routes here
-@app.route('/')
-def index():
-    return 'Hello, World!'
-
-# Run the Flask app
+# Run the Flask application
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
