@@ -5,10 +5,10 @@ services:
     image: mysql:8.0
     container_name: mysql_db
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: task_management_db
-      MYSQL_USER: db_user
-      MYSQL_PASSWORD: db_password
+      MYSQL_ROOT_PASSWORD: kelly          # Use DB_PASSWORD for root user password
+      MYSQL_DATABASE: task_management_db  # Use DB_NAME for database name
+      MYSQL_USER: root                    # Use DB_USERNAME for root user
+      MYSQL_PASSWORD: kelly               # Use DB_PASSWORD for root user password
     volumes:
       - ./taskdumps.sql:/docker-entrypoint-initdb.d/taskdumps.sql
     ports:
